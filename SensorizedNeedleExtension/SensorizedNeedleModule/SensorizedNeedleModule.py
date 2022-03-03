@@ -22,6 +22,7 @@ import logging
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
+import numpy as np
 
 
 class SensorizedNeedleModule(ScriptedLoadableModule):
@@ -97,10 +98,18 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     serverFormLayout.addWidget(self.disconnectFromSocketButton, 2, 1)
     self.disconnectFromSocketButton.connect('clicked()', self.onDisconnectFromSocketButtonClicked)
     
+    # Initialize observers Button for PoseArray
+    self.IniButton = qt.QPushButton("Initialize")
+    self.IniButton.toolTip = "Add observers on currentshape pose arrays"
+    self.IniButton.enabled = True
+    self.IniButton.setMaximumWidth(200)
+    serverFormLayout.addWidget(self.IniButton)
+    self.IniButton.connect('clicked()', self.onIniButtonClicked)	
+    
     # ----- Publishing commands from Slicer to ROS2 modules GUI------	
     # Outbound commands collapsible button
     outboundCollapsibleButton = ctk.ctkCollapsibleButton()
-    outboundCollapsibleButton.text = "Outbound commands to set target and entry point"
+    outboundCollapsibleButton.text = "Outbound commands"
     #outboundCollapsibleButton.collapsed = True
     self.layout.addWidget(outboundCollapsibleButton)
     
@@ -108,11 +117,42 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     
     self.layout.addWidget(outboundCollapsibleButton)
     outboundLayout = qt.QVBoxLayout(outboundCollapsibleButton)
-
+    
+    outboundLayoutTopHome = qt.QFormLayout()
+    outboundLayout.addLayout(outboundLayoutTopHome)
+    
+    # Home Button
+    self.HomeButton = qt.QPushButton("HOME")
+    self.HomeButton.toolTip = "Publish a command to send robot to home position"
+    self.HomeButton.enabled = True
+    self.HomeButton.setMaximumWidth(200)
+    
+    outboundLayoutTopHome.addRow("   Calibrate linear stages: ", self.HomeButton)
+    self.HomeButton.connect('clicked()', self.onHomeButtonClicked)	
+    
+    # Stop Button
+    self.StopButton = qt.QPushButton("STOP")
+    self.StopButton.toolTip = "Publish a command to stop the robot"
+    self.StopButton.enabled = True
+    self.StopButton.setMaximumWidth(200)
+    
+    outboundLayoutTopHome.addRow("   Stop Robot: ", self.StopButton)
+    self.StopButton.connect('clicked()', self.onStopButtonClicked)	
+    
+    # Add point temporary Button
+    #self.AddPointButton = qt.QPushButton("ADD POINT")
+    #self.AddPointButton.toolTip = "Add a point to Curve"
+    #self.AddPointButton.enabled = True
+    #self.AddPointButton.setMaximumWidth(200)
+    #outboundLayoutTopHome.addRow("   Add point:: ", self.AddPointButton)
+    #self.AddPointButton.connect('clicked()', self.onAddPointButtonClicked)	
+    
+    
+    
     # Top layout within the outbound collapsible button
     outboundLayoutTop = qt.QFormLayout()
     outboundLayout.addLayout(outboundLayoutTop)
-
+    
     self.targetPointNodeSelector = slicer.qSlicerSimpleMarkupsWidget()
     self.targetPointNodeSelector.objectName = 'targetPointNodeSelector'
     self.targetPointNodeSelector.toolTip = "Select a fiducial to use as the needle insertion target point."
@@ -155,30 +195,30 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     outboundLayoutTop.addRow(self.sendTargetPointButton)
     self.sendTargetPointButton.connect('clicked()', self.onsendTargetPointButtonClicked)	
 
-    self.skinEntryPointNodeSelector = slicer.qSlicerSimpleMarkupsWidget()
-    self.skinEntryPointNodeSelector.objectName = 'skinEntryPointNodeSelector'
-    self.skinEntryPointNodeSelector.toolTip = "Select a fiducial to use as needle entry point on the skin."
-    self.skinEntryPointNodeSelector.setNodeBaseName("SKIN_ENTRY_POINT")
-    self.skinEntryPointNodeSelector.defaultNodeColor = qt.QColor(170,0,0)
-    self.skinEntryPointNodeSelector.tableWidget().hide()
-    self.skinEntryPointNodeSelector.markupsSelectorComboBox().noneEnabled = False
-    self.skinEntryPointNodeSelector.markupsPlaceWidget().placeMultipleMarkups = slicer.qSlicerMarkupsPlaceWidget.ForcePlaceSingleMarkup
+    #self.skinEntryPointNodeSelector = slicer.qSlicerSimpleMarkupsWidget()
+    #self.skinEntryPointNodeSelector.objectName = 'skinEntryPointNodeSelector'
+    #self.skinEntryPointNodeSelector.toolTip = "Select a fiducial to use as needle entry point on the skin."
+    #self.skinEntryPointNodeSelector.setNodeBaseName("SKIN_ENTRY_POINT")
+    #self.skinEntryPointNodeSelector.defaultNodeColor = qt.QColor(170,0,0)
+    #self.skinEntryPointNodeSelector.tableWidget().hide()
+    #self.skinEntryPointNodeSelector.markupsSelectorComboBox().noneEnabled = False
+    #self.skinEntryPointNodeSelector.markupsPlaceWidget().placeMultipleMarkups = slicer.qSlicerMarkupsPlaceWidget.ForcePlaceSingleMarkup
 
-    outboundLayoutTop.addRow("   Skin entry point: ", self.skinEntryPointNodeSelector)
-    self.parent.connect('mrmlSceneChanged(vtkMRMLScene*)',
-                        self.skinEntryPointNodeSelector, 'setMRMLScene(vtkMRMLScene*)')
+    #outboundLayoutTop.addRow("   Skin entry point: ", self.skinEntryPointNodeSelector)
+    #self.parent.connect('mrmlSceneChanged(vtkMRMLScene*)',
+    #                    self.skinEntryPointNodeSelector, 'setMRMLScene(vtkMRMLScene*)')
                         
     # Print values target fiducial values                       
     self.SkinEntryXYZ = qt.QHBoxLayout()
     self.xSkinEntryTextbox = qt.QLineEdit("")
     self.xSkinEntryLabel = qt.QLabel("x: ")
-    self.xSkinEntryTextbox.setReadOnly(True)
+    self.xSkinEntryTextbox.setReadOnly(False)
     self.ySkinEntryTextbox = qt.QLineEdit("")
     self.ySkinEntryLabel = qt.QLabel("y: ")
     self.ySkinEntryTextbox.setReadOnly(True)
     self.zSkinEntryTextbox = qt.QLineEdit("")
     self.zSkinEntryLabel = qt.QLabel("z: ")
-    self.zSkinEntryTextbox.setReadOnly(True)
+    self.zSkinEntryTextbox.setReadOnly(False)
     
     self.SkinEntryXYZ.addWidget(self.xSkinEntryLabel)
     self.SkinEntryXYZ.addWidget(self.xSkinEntryTextbox)
@@ -188,16 +228,25 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.SkinEntryXYZ.addWidget(self.zSkinEntryTextbox)
     outboundLayoutTop.addRow(qt.QLabel("   Skin entry XYZ:"),self.SkinEntryXYZ)
     
-    self.skinEntryPointNodeSelector.connect('updateFinished()', self.onSkinEntryPointFiducialChanged)
+    #self.skinEntryPointNodeSelector.connect('updateFinished()', self.onSkinEntryPointFiducialChanged)
     
     
     # Send Skin Entry Point Button
     self.sendSkinEntryPointButton = qt.QPushButton("SEND SKIN ENTRY POINT")
     self.sendSkinEntryPointButton.toolTip = "Publish point coordinates for skin entry point"
-    self.sendSkinEntryPointButton.enabled = True
+    self.sendSkinEntryPointButton.enabled = False
     self.sendSkinEntryPointButton.setMaximumWidth(200)
-    outboundLayoutTop.addRow(self.sendSkinEntryPointButton)
+    outboundLayoutTop.addRow("   Publish Skin Entry coordinates : ",self.sendSkinEntryPointButton)
     self.sendSkinEntryPointButton.connect('clicked()', self.onsendSkinEntryPointButtonClicked)
+    
+    # Move to skin entry aligned with target point Button
+    self.OriginButton = qt.QPushButton("ORIGIN")
+    self.OriginButton.toolTip = "Publish a command to move robot to entry position (aligned with target point)"
+    self.OriginButton.enabled = False
+    self.OriginButton.setMaximumWidth(200)
+    outboundLayoutTop.addRow("   Move linear stages to origin: ", self.OriginButton)
+    self.OriginButton.connect('clicked()', self.onOriginButtonClicked)	
+    
     
     # Visibility icon planned path needle
     self.plannedPathNeedleVisibleButton = qt.QPushButton()
@@ -243,10 +292,10 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     # Layout within the path collapsible button
     NeedleGuideFormLayout = qt.QFormLayout(NeedleGuideCollapsibleButton)
     
-    self.poseTextbox = qt.QLineEdit("No needle pose received")
-    self.poseTextbox.setReadOnly(True)
-    self.poseTextbox.setFixedWidth(400)
-    NeedleGuideFormLayout.addRow("Needle pose received:", self.poseTextbox)
+    #self.poseTextbox = qt.QLineEdit("No needle pose received")
+    #self.poseTextbox.setReadOnly(True)
+    #self.poseTextbox.setFixedWidth(400)
+    #NeedleGuideFormLayout.addRow("Needle pose received:", self.poseTextbox)
     
     self.xTextbox = qt.QLineEdit("No x position received")
     self.xTextbox.setReadOnly(True)
@@ -280,28 +329,28 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     sensorizedNeedleCollapsibleButton.text = "Sensorized needle feedback"
     self.layout.addWidget(sensorizedNeedleCollapsibleButton)
     
-    NeedleShapeGridLayout = qt.QGridLayout(sensorizedNeedleCollapsibleButton)
-    row = 4
-    column = 4
-    self.ShapetableWidget = qt.QTableWidget(row, column)
-    self.ShapetableWidget.setMinimumHeight(95)
-    self.ShapetableWidget.verticalHeader().hide() # Remove line numbers
-    self.ShapetableWidget.horizontalHeader().hide() # Remove column numbers
-    self.ShapetableWidget.setEditTriggers(qt.QTableWidget.NoEditTriggers) # Make table read-only
-    horizontalheader = self.ShapetableWidget.horizontalHeader()
-    horizontalheader.setSectionResizeMode(0, qt.QHeaderView.Stretch)
-    horizontalheader.setSectionResizeMode(1, qt.QHeaderView.Stretch)
-    horizontalheader.setSectionResizeMode(2, qt.QHeaderView.Stretch)
-    horizontalheader.setSectionResizeMode(3, qt.QHeaderView.Stretch)
-
-    verticalheader = self.ShapetableWidget.verticalHeader()
-    verticalheader.setSectionResizeMode(0, qt.QHeaderView.Stretch)
-    verticalheader.setSectionResizeMode(1, qt.QHeaderView.Stretch)
-    verticalheader.setSectionResizeMode(2, qt.QHeaderView.Stretch)
-    verticalheader.setSectionResizeMode(3, qt.QHeaderView.Stretch)
-    ShapetableWidgetLabel = qt.QLabel("   Needle shape received:")
-    NeedleShapeGridLayout.addWidget(ShapetableWidgetLabel, 3, 0)
-    NeedleShapeGridLayout.addWidget(self.ShapetableWidget, 3, 1)
+    
+    NeedleShapeGridLayout = qt.QFormLayout(sensorizedNeedleCollapsibleButton)
+    
+    # Print values target fiducial values                       
+    self.NeedleEndXYZ = qt.QHBoxLayout()
+    self.xNeedleEndTextbox = qt.QLineEdit("")
+    self.xNeedleEndLabel = qt.QLabel("x: ")
+    self.xNeedleEndTextbox.setReadOnly(True)
+    self.yNeedleEndTextbox = qt.QLineEdit("")
+    self.yNeedleEndLabel = qt.QLabel("y: ")
+    self.yNeedleEndTextbox.setReadOnly(True)
+    self.zNeedleEndTextbox = qt.QLineEdit("")
+    self.zNeedleEndLabel = qt.QLabel("z: ")
+    self.zNeedleEndTextbox.setReadOnly(True)
+    
+    self.NeedleEndXYZ.addWidget(self.xNeedleEndLabel)
+    self.NeedleEndXYZ.addWidget(self.xNeedleEndTextbox)
+    self.NeedleEndXYZ.addWidget(self.yNeedleEndLabel)
+    self.NeedleEndXYZ.addWidget(self.yNeedleEndTextbox)
+    self.NeedleEndXYZ.addWidget(self.zNeedleEndLabel)
+    self.NeedleEndXYZ.addWidget(self.zNeedleEndTextbox)
+    NeedleShapeGridLayout.addRow(qt.QLabel("   End point position of the needle shape:"),self.NeedleEndXYZ)
     
     # Define empty Nodes 
     self.PlannedPathTransform = None
@@ -309,6 +358,30 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     #XStageMatrix = vtk.vtkMatrix4x4()
     #XStageMatrix.Identity()
     #self.XStageTransform.SetMatrixTransformToParent(XStageMatrix)
+    
+    #row = 4
+    #column = 4
+    #self.ShapetableWidget = qt.QTableWidget(row, column)
+    #self.ShapetableWidget.setMinimumHeight(95)
+    #self.ShapetableWidget.verticalHeader().hide() # Remove line numbers
+    #self.ShapetableWidget.horizontalHeader().hide() # Remove column numbers
+    #self.ShapetableWidget.setEditTriggers(qt.QTableWidget.NoEditTriggers) # Make table read-only
+    #horizontalheader = self.ShapetableWidget.horizontalHeader()
+    #horizontalheader.setSectionResizeMode(0, qt.QHeaderView.Stretch)
+    #horizontalheader.setSectionResizeMode(1, qt.QHeaderView.Stretch)
+    #horizontalheader.setSectionResizeMode(2, qt.QHeaderView.Stretch)
+    #horizontalheader.setSectionResizeMode(3, qt.QHeaderView.Stretch)
+
+    #verticalheader = self.ShapetableWidget.verticalHeader()
+    #verticalheader.setSectionResizeMode(0, qt.QHeaderView.Stretch)
+    #verticalheader.setSectionResizeMode(1, qt.QHeaderView.Stretch)
+    #verticalheader.setSectionResizeMode(2, qt.QHeaderView.Stretch)
+    #verticalheader.setSectionResizeMode(3, qt.QHeaderView.Stretch)
+    #ShapetableWidgetLabel = qt.QLabel("   End point position of the needle shape:")
+    #NeedleShapeGridLayout.addWidget(ShapetableWidgetLabel, 3, 0)
+    #NeedleShapeGridLayout.addWidget(self.ShapetableWidget, 3, 1)
+    
+
     
   # ----- Functions to establish OpenIGTL connection------	  
   def onCreateServerButtonClicked(self):
@@ -340,19 +413,24 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     ReceivedNeedlePose.SetName("/stage/state/needle")
     slicer.mrmlScene.AddNode(ReceivedNeedlePose)
     
-    #ReceivedNeedleShape = slicer.vtkMRMLLinearTransformNode()
-    #ReceivedNeedleShape.SetName("currentshape")
-    #slicer.mrmlScene.AddNode(ReceivedNeedleShape)
+    #ReceivedNeedleShape0 = slicer.vtkMRMLLinearTransformNode()
+    #ReceivedNeedleShape0.SetName("currentshape_0")
+    #slicer.mrmlScene.AddNode(ReceivedNeedleShape0)
     
     XStageTransform = slicer.vtkMRMLLinearTransformNode()
     XStageTransform.SetName("XStageTransform")
     slicer.mrmlScene.AddNode(XStageTransform)
     
+    #Add node for Needle Shape cruve
+    CurveNeedleShapeNode = slicer.vtkMRMLMarkupsCurveNode()
+    CurveNeedleShapeNode.SetName("CurveNeedleShape")
+    slicer.mrmlScene.AddNode(CurveNeedleShapeNode)  
+    
     # Add observers on the message type nodes
     #ReceivedStringMsg.AddObserver(slicer.vtkMRMLTextNode.TextModifiedEvent, self.onTextNodeModified)
     
-    #ReceivedNeedlePose.AddObserver(slicer.vtkMRMLTextNode.TextModifiedEvent, self.onNeedlePoseNodeModified)
-    #ReceivedNeedleShape.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onNeedleShapeNodeModified)
+    ReceivedNeedlePose.AddObserver(slicer.vtkMRMLTextNode.TextModifiedEvent, self.onNeedlePoseNodeModified)
+    #ReceivedNeedleShape0.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onNeedleShapeNodeModified)
     
   def onDisconnectFromSocketButtonClicked(self):
     self.openIGTNode.Stop()
@@ -365,6 +443,9 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.snrPortTextbox.setReadOnly(False)
     self.snrHostnameTextbox.setReadOnly(False)
   
+  def onIniButtonClicked(self):
+    ReceivedNeedleShape0 = slicer.mrmlScene.GetFirstNodeByName("currentshape_0")
+    ReceivedNeedleShape0.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onNeedleShapeNodeModified)
     
   # ----- Functions to set target and skin entry points ------	  
     
@@ -377,35 +458,35 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     		self.yTargetTextbox.setText(round(targetCoordinatesRAS[1],2))
     		self.zTargetTextbox.setText(round(targetCoordinatesRAS[2],2))
     		
-  def onSkinEntryPointFiducialChanged(self):
-    skinEntryPointNode = self.skinEntryPointNodeSelector.currentNode()
-    if skinEntryPointNode is not None:
-      if not skinEntryPointNode.GetNumberOfControlPoints() == 0:
-        if self.PlannedPathTransform:
-          slicer.mrmlScene.RemoveNode(self.PlannedPathTransform)
-          self.PlannedPathTransform = None
-        self.PlannedPathTransform = slicer.vtkMRMLLinearTransformNode()
-        self.PlannedPathTransform.SetName("PlannedPathTransform")
-        slicer.mrmlScene.AddNode(self.PlannedPathTransform)
+  #def onSkinEntryPointFiducialChanged(self):
+    #skinEntryPointNode = self.skinEntryPointNodeSelector.currentNode()
+   # if skinEntryPointNode is not None:
+      #if not skinEntryPointNode.GetNumberOfControlPoints() == 0:
+      #  if self.PlannedPathTransform:
+         # slicer.mrmlScene.RemoveNode(self.PlannedPathTransform)
+         # self.PlannedPathTransform = None
+       # self.PlannedPathTransform = slicer.vtkMRMLLinearTransformNode()
+       # self.PlannedPathTransform.SetName("PlannedPathTransform")
+       # slicer.mrmlScene.AddNode(self.PlannedPathTransform)
         #self.PlannedPathTransform.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onPlannedPathTransformNodeModified)
         
-        skinEntryCoordinatesRAS = skinEntryPointNode.GetNthControlPointPositionVector(0)
-        self.xSkinEntryTextbox.setText(round(skinEntryCoordinatesRAS[0],2))
-        self.ySkinEntryTextbox.setText(round(skinEntryCoordinatesRAS[1],2))
-        self.zSkinEntryTextbox.setText(round(skinEntryCoordinatesRAS[2],2))
-        skinEntryPointMatrix = vtk.vtkMatrix4x4()
-        skinEntryPointMatrix.Identity()
-        skinEntryPointMatrix.SetElement(0,3,skinEntryCoordinatesRAS[0])
-        skinEntryPointMatrix.SetElement(1,3,skinEntryCoordinatesRAS[1])
-        skinEntryPointMatrix.SetElement(2,3,skinEntryCoordinatesRAS[2])
-        self.PlannedPathTransform.SetMatrixTransformToParent(skinEntryPointMatrix)
-        if slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle") is not None:
-          PointerNodeToRemove = slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle")
-          slicer.mrmlScene.RemoveNode(PointerNodeToRemove)      
-        self.AddPointerModel("PlannedPathNeedle")
-        TransformNodeToDisplay = slicer.mrmlScene.GetFirstNodeByName("PlannedPathTransform")
-        locatorModelNode = slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle")
-        locatorModelNode.SetAndObserveTransformNodeID(TransformNodeToDisplay.GetID())
+        #skinEntryCoordinatesRAS = skinEntryPointNode.GetNthControlPointPositionVector(0)
+        #self.xSkinEntryTextbox.setText(round(skinEntryCoordinatesRAS[0],2))
+       # self.ySkinEntryTextbox.setText(round(skinEntryCoordinatesRAS[1],2))
+       # self.zSkinEntryTextbox.setText(round(skinEntryCoordinatesRAS[2],2))
+        #skinEntryPointMatrix = vtk.vtkMatrix4x4()
+       # skinEntryPointMatrix.Identity()
+        #skinEntryPointMatrix.SetElement(0,3,skinEntryCoordinatesRAS[0])
+        #skinEntryPointMatrix.SetElement(1,3,skinEntryCoordinatesRAS[1])
+        #skinEntryPointMatrix.SetElement(2,3,skinEntryCoordinatesRAS[2])
+        #self.PlannedPathTransform.SetMatrixTransformToParent(skinEntryPointMatrix)
+       # if slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle") is not None:
+        #  PointerNodeToRemove = slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle")
+      #    slicer.mrmlScene.RemoveNode(PointerNodeToRemove)      
+       # self.AddPointerModel("PlannedPathNeedle")
+      #  TransformNodeToDisplay = slicer.mrmlScene.GetFirstNodeByName("PlannedPathTransform")
+       # locatorModelNode = slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle")
+       # locatorModelNode.SetAndObserveTransformNodeID(TransformNodeToDisplay.GetID())
         
         
         
@@ -487,18 +568,74 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
       self.plannedPathNeedleVisibleButton.setIcon(qt.QIcon(eyeIconInvisible))
       PointerNodeToRemove = slicer.mrmlScene.GetFirstNodeByName("PlannedPathNeedle")
       slicer.mrmlScene.RemoveNode(PointerNodeToRemove)
+  def onHomeButtonClicked(self):
+    print("Sending home command")
+    #Publish home command   
+    # Send stringMessage containing the command "HOME" to the script via IGTLink
+    homeNode = slicer.vtkMRMLTextNode()
+    homeNode.SetName("HOME")
+    homeNode.SetText("HOME")
+    homeNode.SetEncoding(3)
+    slicer.mrmlScene.AddNode(homeNode)
+    self.openIGTNode.RegisterOutgoingMRMLNode(homeNode)
+    self.openIGTNode.PushNode(homeNode) 
+    
+  def onStopButtonClicked(self):
+    print("Sending ABORT command")
+    #Publish ABORT command   
+    # Send stringMessage containing the command "HOME" to the script via IGTLink
+    stopNode = slicer.vtkMRMLTextNode()
+    stopNode.SetName("STOP")
+    stopNode.SetText("ABORT")
+    stopNode.SetEncoding(3)
+    slicer.mrmlScene.AddNode(stopNode)
+    self.openIGTNode.RegisterOutgoingMRMLNode(stopNode)
+    self.openIGTNode.PushNode(stopNode) 
+     
+  #def onAddPointButtonClicked(self):
+    #print("Sending home command")
+    #TODO 
+    #Publish home command  
+    #CurveNeedleShapeNode = slicer.mrmlScene.GetFirstNodeByName("CurveNeedleShape")        
+    # Using above first method to create a 2D array
+    
+    #newPoint = [98, 100, 110]
+    #print(newPoint)  
+    
+    #CurveNeedleShapeNode.AddControlPoint(vtk.vtkVector3d(newPoint[0],newPoint[1],newPoint[2]))   
+    
+  def onOriginButtonClicked(self):
+    print("Moving robot to origin")
+    # Send stringMessage containing the command "ORIGIN;xskinEntry;zSkinEntry" to the script via IGTLink
+    originNode = slicer.vtkMRMLTextNode()
+    originNode.SetName("ORIGIN")
+    origin_msg = "ORIGIN;" + self.xSkinEntryTextbox.text + ";" + self.zSkinEntryTextbox.text
+    originNode.SetText(origin_msg)
+    print("Sending origin msg: ", origin_msg)
+    originNode.SetEncoding(3)
+    slicer.mrmlScene.AddNode(originNode)
+    self.openIGTNode.RegisterOutgoingMRMLNode(originNode)
+    self.openIGTNode.PushNode(originNode) 
     
   def onsendTargetPointButtonClicked(self):   
     print("Sending target point coordinates")
     targetMsgNode = slicer.mrmlScene.GetFirstNodeByName("TARGET_POINT")
     self.openIGTNode.RegisterOutgoingMRMLNode(targetMsgNode)
     self.openIGTNode.PushNode(targetMsgNode)
+    #Enable Origin button and send skin target button 
+    self.sendSkinEntryPointButton.enabled = True
+    self.OriginButton.enabled = True
+    
+    self.xSkinEntryTextbox.setText(self.xTargetTextbox.text)
+    self.zSkinEntryTextbox.setText(self.zTargetTextbox.text)
     
   def onsendSkinEntryPointButtonClicked(self):  
     print("Sending skin entry point coordinates")
     skinEntryMsgNode = slicer.mrmlScene.GetFirstNodeByName("SKIN_ENTRY_POINT")
     self.openIGTNode.RegisterOutgoingMRMLNode(skinEntryMsgNode)
     self.openIGTNode.PushNode(skinEntryMsgNode)  
+   #TODO Make it aligned with target point and not a point you can click 
+   # Maybe define one that is linea, one with 5 degrees angle to the right, one with five degree angle to the left 
    
    # ----- Functions to get needle pose feedback ------
      
@@ -506,7 +643,7 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     print("New needle pose was received")
     ReceivedNeedlePose = slicer.mrmlScene.GetFirstNodeByName("/stage/state/needle")
     concatenatePose = ReceivedNeedlePose.GetText()
-    poseNode.poseTextbox.setText(concatenatePose)
+    #poseNode.poseTextbox.setText(concatenatePose)
     print("Received ", ReceivedNeedlePose.GetText()) 
     
     # Deconcatenate pose values
@@ -553,39 +690,38 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
       blockModelNode.SetAndObserveTransformNodeID(TransformNodeToDisplay.GetID())
       
   def onNeedleShapeNodeModified(shapeNode, unusedArg2=None, unusedArg3=None): 
-    print("New needle shape was received")   
-    #ReceivedNeedleShape = slicer.mrmlScene.GetFirstNodeByName("currentshape")
-    
-    test = slicer.mrmlScene.GetNodeByID("vtkMRMLLinearTransformNode5")
-    testtransformMatrix = vtk.vtkMatrix4x4()
-    test.GetMatrixTransformToParent(testtransformMatrix)
-    print(testtransformMatrix)
-    
-    classname = test.GetClassName()
-    print(classname)
-    #shapeNode.AddPointerModel("ShapeNeedle")
-    #TransformNodeToDisplay = test
-    #shapelocatorModelNode = slicer.mrmlScene.GetFirstNodeByName("ShapeNeedle")
-    #shapelocatorModelNode.SetAndObserveTransformNodeID(TransformNodeToDisplay.GetID())
-      
-    #transformMatrix = vtk.vtkMatrix4x4()
-    #ReceivedNeedleShape.GetMatrixTransformToParent(transformMatrix)
-    #print(transformMatrix)
+    print("New needle shape was received")  
 
+    # Initialize variables	
+    i = 0;
+    pointPositions = np.empty((0, 3), float)
     
-    nbRows = shapeNode.ShapetableWidget.rowCount
-    print("rbrows:")
-    print(nbRows)
-    nbColumns = shapeNode.ShapetableWidget.columnCount
-    print("nbcolumns:")
-    print(nbColumns)
-    for i in range(nbRows):
-      for j in range(nbColumns):
-        val = testtransformMatrix.GetElement(i,j)
-        val = round(val,2)
-        print(val)
-        shapeNode.ShapetableWidget.setItem(i , j, qt.QTableWidgetItem(str(val)))
+    while  slicer.mrmlScene.GetFirstNodeByName("currentshape_" + str(i)) is not None:
+    	ReceivedNeedleShape_temp = slicer.mrmlScene.GetFirstNodeByName("currentshape_" +  str(i))
+    	transformMatrix_temp = vtk.vtkMatrix4x4()
+    	ReceivedNeedleShape_temp.GetMatrixTransformToParent(transformMatrix_temp)
+    	i+=1
 
+    	# Append new point to array point positions
+	
+    	pointPositions = np.append(pointPositions, np.array([[transformMatrix_temp.GetElement(0,3), transformMatrix_temp.GetElement(1,3), transformMatrix_temp.GetElement(2,3)]]), axis=0)
+    	
+    # Display the end point transform 
+    ReceivedNeedleShape_END = slicer.mrmlScene.GetFirstNodeByName("currentshape_" +  str(i-1))
+    endPointtransformMatrix = vtk.vtkMatrix4x4()
+    ReceivedNeedleShape_END.GetMatrixTransformToParent(endPointtransformMatrix)
+    
+    shapeNode.xNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(0,3),2))
+    shapeNode.yNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(1,3),2))
+    shapeNode.zNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(2,3),2))
+        
+    # Update Shape Needle Curve    
+    print(pointPositions)
+    CurveNeedleShapeNode = slicer.mrmlScene.GetFirstNodeByName("CurveNeedleShape")         
+    
+    slicer.util.updateMarkupsControlPointsFromArray(CurveNeedleShapeNode, pointPositions)
+        
+    
   def AddBlockModel(self, blockNodeName):   
     self.Xrec = vtk.vtkCubeSource()
     self.Xrec.SetXLength(60)
