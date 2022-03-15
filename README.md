@@ -15,4 +15,3 @@ In order to add this module to 3DSlicer. Open the panel: Edit --> Modules --> Cl
 
 Functionalities
 ---------------
-
