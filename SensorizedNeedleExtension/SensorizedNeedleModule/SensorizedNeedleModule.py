@@ -99,12 +99,12 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.disconnectFromSocketButton.connect('clicked()', self.onDisconnectFromSocketButtonClicked)
     
     # Initialize observers Button for PoseArray
-    self.IniButton = qt.QPushButton("Initialize")
-    self.IniButton.toolTip = "Add observers on currentshape pose arrays"
-    self.IniButton.enabled = True
-    self.IniButton.setMaximumWidth(200)
-    serverFormLayout.addWidget(self.IniButton)
-    self.IniButton.connect('clicked()', self.onIniButtonClicked)	
+    #self.IniButton = qt.QPushButton("Initialize")
+    #self.IniButton.toolTip = "Add observers on currentshape pose arrays"
+    #self.IniButton.enabled = True
+    #self.IniButton.setMaximumWidth(200)
+    #serverFormLayout.addWidget(self.IniButton)
+    #self.IniButton.connect('clicked()', self.onIniButtonClicked)	
     
     # ----- Publishing commands from Slicer to ROS2 modules GUI------	
     # Outbound commands collapsible button
@@ -183,7 +183,7 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.TargetXYZ.addWidget(self.yTargetTextbox)
     self.TargetXYZ.addWidget(self.zTargetLabel)
     self.TargetXYZ.addWidget(self.zTargetTextbox)
-    outboundLayoutTop.addRow(qt.QLabel("   Target XYZ:"),self.TargetXYZ)
+    outboundLayoutTop.addRow(qt.QLabel("   Target XYZ [mm]:"),self.TargetXYZ)
 
     self.targetPointNodeSelector.connect('updateFinished()', self.onTargetPointFiducialChanged)
 
@@ -226,7 +226,7 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.SkinEntryXYZ.addWidget(self.ySkinEntryTextbox)
     self.SkinEntryXYZ.addWidget(self.zSkinEntryLabel)
     self.SkinEntryXYZ.addWidget(self.zSkinEntryTextbox)
-    outboundLayoutTop.addRow(qt.QLabel("   Skin entry XYZ:"),self.SkinEntryXYZ)
+    outboundLayoutTop.addRow(qt.QLabel("   Skin entry XYZ [mm]:"),self.SkinEntryXYZ)
     
     #self.skinEntryPointNodeSelector.connect('updateFinished()', self.onSkinEntryPointFiducialChanged)
     
@@ -413,6 +413,10 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     ReceivedNeedlePose.SetName("/stage/state/needle")
     slicer.mrmlScene.AddNode(ReceivedNeedlePose)
     
+    ReceivedStringNewShape = slicer.vtkMRMLTextNode()
+    ReceivedStringNewShape.SetName("NewShape")
+    slicer.mrmlScene.AddNode(ReceivedStringNewShape)
+    
     #ReceivedNeedleShape0 = slicer.vtkMRMLLinearTransformNode()
     #ReceivedNeedleShape0.SetName("currentshape_0")
     #slicer.mrmlScene.AddNode(ReceivedNeedleShape0)
@@ -421,13 +425,18 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     XStageTransform.SetName("XStageTransform")
     slicer.mrmlScene.AddNode(XStageTransform)
     
-    #Add node for Needle Shape cruve
+    #Add node for Needle Shape curve
     CurveNeedleShapeNode = slicer.vtkMRMLMarkupsCurveNode()
     CurveNeedleShapeNode.SetName("CurveNeedleShape")
     slicer.mrmlScene.AddNode(CurveNeedleShapeNode)  
     
+    #Add node for Needle Shape fiducials
+    #FiducialsNeedleShapeNode = slicer.vtkMRMLMarkupsFiducialNode()
+    #FiducialsNeedleShapeNode.SetName("FiducialsNeedleShape")
+    #slicer.mrmlScene.AddNode(FiducialsNeedleShapeNode)  
+    
     # Add observers on the message type nodes
-    #ReceivedStringMsg.AddObserver(slicer.vtkMRMLTextNode.TextModifiedEvent, self.onTextNodeModified)
+    ReceivedStringNewShape.AddObserver(slicer.vtkMRMLTextNode.TextModifiedEvent, self.onNeedleShapeNodeModified)
     
     ReceivedNeedlePose.AddObserver(slicer.vtkMRMLTextNode.TextModifiedEvent, self.onNeedlePoseNodeModified)
     #ReceivedNeedleShape0.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onNeedleShapeNodeModified)
@@ -443,9 +452,9 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.snrPortTextbox.setReadOnly(False)
     self.snrHostnameTextbox.setReadOnly(False)
   
-  def onIniButtonClicked(self):
-    ReceivedNeedleShape0 = slicer.mrmlScene.GetFirstNodeByName("currentshape_0")
-    ReceivedNeedleShape0.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onNeedleShapeNodeModified)
+  #def onIniButtonClicked(self):
+    #ReceivedNeedleShape0 = slicer.mrmlScene.GetFirstNodeByName("currentshape_0")
+    #ReceivedNeedleShape0.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.onNeedleShapeNodeModified)
     
   # ----- Functions to set target and skin entry points ------	  
     
@@ -690,37 +699,71 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
       blockModelNode.SetAndObserveTransformNodeID(TransformNodeToDisplay.GetID())
       
   def onNeedleShapeNodeModified(shapeNode, unusedArg2=None, unusedArg3=None): 
-    print("New needle shape was received")  
-
-    # Initialize variables	
-    i = 0;
-    pointPositions = np.empty((0, 3), float)
+    ReceivedStringNewShape = slicer.mrmlScene.GetFirstNodeByName("NewShape")
+    concatenateShape = ReceivedStringNewShape.GetText()
     
-    while  slicer.mrmlScene.GetFirstNodeByName("currentshape_" + str(i)) is not None:
-    	ReceivedNeedleShape_temp = slicer.mrmlScene.GetFirstNodeByName("currentshape_" +  str(i))
-    	transformMatrix_temp = vtk.vtkMatrix4x4()
-    	ReceivedNeedleShape_temp.GetMatrixTransformToParent(transformMatrix_temp)
-    	i+=1
-
-    	# Append new point to array point positions
-	
-    	pointPositions = np.append(pointPositions, np.array([[transformMatrix_temp.GetElement(0,3), transformMatrix_temp.GetElement(1,3), transformMatrix_temp.GetElement(2,3)]]), axis=0)
-    	
-    # Display the end point transform 
-    ReceivedNeedleShape_END = slicer.mrmlScene.GetFirstNodeByName("currentshape_" +  str(i-1))
-    endPointtransformMatrix = vtk.vtkMatrix4x4()
-    ReceivedNeedleShape_END.GetMatrixTransformToParent(endPointtransformMatrix)
+    # Remove and create new fiducials points for needle shape 	
+    #FiducialsNeedleShapeNode = slicer.mrmlScene.GetFirstNodeByName("FiducialsNeedleShape") 
+    #slicer.mrmlScene.RemoveNode(FiducialsNeedleShapeNode)
+    #FiducialsNeedleShapeNode = slicer.vtkMRMLMarkupsFiducialNode()
+    #FiducialsNeedleShapeNode.SetName("FiducialsNeedleShape")
+    #slicer.mrmlScene.AddNode(FiducialsNeedleShapeNode)
     
-    shapeNode.xNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(0,3),2))
-    shapeNode.yNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(1,3),2))
-    shapeNode.zNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(2,3),2))
+    delimit = ";"
+    if(concatenateShape.find(delimit)!=-1): # found delimiter in the string
+      nb_shape = concatenateShape[0: concatenateShape.index(delimit)]
+      idx = concatenateShape.index(delimit)
+      nb_poses = concatenateShape[idx +1 :len(concatenateShape)]
+      nb_poses = int(nb_poses)
+      print("Needle shape nb:", nb_shape ,"was received and has", nb_poses,"poses") 
+    
+      # Initialize variables	
+      #i = 0;
+      pointPositions = np.empty((0, 3), float)
+    
+      #while  slicer.mrmlScene.GetFirstNodeByName("currentshape_" + str(i)) is not None:
+      for i in range (nb_poses):
+        ReceivedNeedleShape_temp = slicer.mrmlScene.GetFirstNodeByName("currentshape_" +  str(i))
+        transformMatrix_temp = vtk.vtkMatrix4x4()
+        ReceivedNeedleShape_temp.GetMatrixTransformToParent(transformMatrix_temp)
+        i+=1
         
-    # Update Shape Needle Curve    
-    print(pointPositions)
-    CurveNeedleShapeNode = slicer.mrmlScene.GetFirstNodeByName("CurveNeedleShape")         
+        # Append new point to array point positions
+        pointPositions = np.append(pointPositions, np.array([[transformMatrix_temp.GetElement(0,3), transformMatrix_temp.GetElement(1,3), transformMatrix_temp.GetElement(2,3)]]), axis=0)
+
+      # For list of fiducials  
+        #pointsVector = vtk.vtkVector3d()
+        #pointsVector.SetX(transformMatrix_temp.GetElement(0,3))
+        #pointsVector.SetY(transformMatrix_temp.GetElement(1,3))
+        #pointsVector.SetZ(transformMatrix_temp.GetElement(2,3))
+        #FiducialsNeedleShapeNode.AddControlPoint(pointsVector)
+      # Display the end point transform 
+      ReceivedNeedleShape_END = slicer.mrmlScene.GetFirstNodeByName("currentshape_" +  str(nb_poses-1))
+      endPointtransformMatrix = vtk.vtkMatrix4x4()
+      ReceivedNeedleShape_END.GetMatrixTransformToParent(endPointtransformMatrix)
     
-    slicer.util.updateMarkupsControlPointsFromArray(CurveNeedleShapeNode, pointPositions)
+      shapeNode.xNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(0,3),2))
+      shapeNode.yNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(1,3),2))
+      shapeNode.zNeedleEndTextbox.setText(round(endPointtransformMatrix.GetElement(2,3),2))
         
+      # Update Shape Needle Curve    
+      #print(pointPositions)
+      print("The nb of points in the Curve is:" , len(pointPositions))
+      points = vtk.vtkPoints()
+      vtkpointsData = vtk.util.numpy_support.numpy_to_vtk(pointPositions, deep=1)
+      points.SetNumberOfPoints(len(pointPositions))
+      points.SetData(vtkpointsData)
+    
+      CurveNeedleShapeNode = slicer.mrmlScene.GetFirstNodeByName("CurveNeedleShape") 
+      slicer.mrmlScene.RemoveNode(CurveNeedleShapeNode)
+      CurveNeedleShapeNode = slicer.vtkMRMLMarkupsCurveNode()
+      CurveNeedleShapeNode.SetName("CurveNeedleShape")
+      slicer.mrmlScene.AddNode(CurveNeedleShapeNode) 
+      CurveNeedleShapeNode.SetControlPointPositionsWorld(points)      
+    
+      slicer.util.updateMarkupsControlPointsFromArray(CurveNeedleShapeNode, pointPositions)
+    else: 
+      print("Error: No indication on nb of needle shape poses sent")    
     
   def AddBlockModel(self, blockNodeName):   
     self.Xrec = vtk.vtkCubeSource()
