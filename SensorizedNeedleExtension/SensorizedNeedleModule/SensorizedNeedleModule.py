@@ -118,27 +118,7 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(outboundCollapsibleButton)
     outboundLayout = qt.QVBoxLayout(outboundCollapsibleButton)
     
-    outboundLayoutTopHome = qt.QFormLayout()
-    outboundLayout.addLayout(outboundLayoutTopHome)
-    
-    # Home Button
-    self.HomeButton = qt.QPushButton("HOME")
-    self.HomeButton.toolTip = "Publish a command to send robot to home position"
-    self.HomeButton.enabled = True
-    self.HomeButton.setMaximumWidth(200)
-    
-    outboundLayoutTopHome.addRow("   Calibrate linear stages: ", self.HomeButton)
-    self.HomeButton.connect('clicked()', self.onHomeButtonClicked)	
-    
-    # Stop Button
-    self.StopButton = qt.QPushButton("STOP")
-    self.StopButton.toolTip = "Publish a command to stop the robot"
-    self.StopButton.enabled = True
-    self.StopButton.setMaximumWidth(200)
-    
-    outboundLayoutTopHome.addRow("   Stop Robot: ", self.StopButton)
-    self.StopButton.connect('clicked()', self.onStopButtonClicked)	
-    
+
     # Add point temporary Button
     #self.AddPointButton = qt.QPushButton("ADD POINT")
     #self.AddPointButton.toolTip = "Add a point to Curve"
@@ -169,13 +149,13 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.TargetXYZ = qt.QHBoxLayout()
     self.xTargetTextbox = qt.QLineEdit("")
     self.xTargetLabel = qt.QLabel("x: ")
-    self.xTargetTextbox.setReadOnly(True)
+    self.xTargetTextbox.setReadOnly(False)
     self.yTargetTextbox = qt.QLineEdit("")
     self.yTargetLabel = qt.QLabel("y: ")
-    self.yTargetTextbox.setReadOnly(True)
+    self.yTargetTextbox.setReadOnly(False)
     self.zTargetTextbox = qt.QLineEdit("")
     self.zTargetLabel = qt.QLabel("z: ")
-    self.zTargetTextbox.setReadOnly(True)
+    self.zTargetTextbox.setReadOnly(False)
     
     self.TargetXYZ.addWidget(self.xTargetLabel)
     self.TargetXYZ.addWidget(self.xTargetTextbox)
@@ -187,13 +167,6 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
 
     self.targetPointNodeSelector.connect('updateFinished()', self.onTargetPointFiducialChanged)
 
-    # Send Target Point Button
-    self.sendTargetPointButton = qt.QPushButton("SEND TARGET POINT")
-    self.sendTargetPointButton.toolTip = "Publish point coordinates for target point"
-    self.sendTargetPointButton.enabled = True
-    self.sendTargetPointButton.setMaximumWidth(200)
-    outboundLayoutTop.addRow(self.sendTargetPointButton)
-    self.sendTargetPointButton.connect('clicked()', self.onsendTargetPointButtonClicked)	
 
     #self.skinEntryPointNodeSelector = slicer.qSlicerSimpleMarkupsWidget()
     #self.skinEntryPointNodeSelector.objectName = 'skinEntryPointNodeSelector'
@@ -230,6 +203,39 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     
     #self.skinEntryPointNodeSelector.connect('updateFinished()', self.onSkinEntryPointFiducialChanged)
     
+    # Home Button
+    self.HomeButton = qt.QPushButton("HOME")
+    self.HomeButton.toolTip = "Publish a command to send robot to home position"
+    self.HomeButton.enabled = True
+    self.HomeButton.setMaximumWidth(200)
+    
+    outboundLayoutTop.addRow("   Calibrate linear stages: ", self.HomeButton)
+    self.HomeButton.connect('clicked()', self.onHomeButtonClicked)	
+    
+    
+    # Move to skin entry aligned with target point Button
+    self.OriginButton = qt.QPushButton("ORIGIN")
+    self.OriginButton.toolTip = "Publish a command to move robot to entry position (aligned with target point)"
+    self.OriginButton.enabled = True
+    self.OriginButton.setMaximumWidth(200)
+    outboundLayoutTop.addRow("   Move linear stages to origin: ", self.OriginButton)
+    self.OriginButton.connect('clicked()', self.onOriginButtonClicked)
+
+    #Set skin entry to zero of the robot frame
+    self.ZeroButton = qt.QPushButton("ZERO")
+    self.ZeroButton.toolTip = "Publish a command to set the zero of the robot frame to the origin (entry position)"
+    self.ZeroButton.enabled = True
+    self.ZeroButton.setMaximumWidth(200)
+    outboundLayoutTop.addRow("   Set actual position the zero of the robot frame: ", self.ZeroButton)
+    self.ZeroButton.connect('clicked()', self.onZeroButtonClicked)
+    
+    # Send Target Point Button
+    self.sendTargetPointButton = qt.QPushButton("SEND TARGET POINT")
+    self.sendTargetPointButton.toolTip = "Publish point coordinates for target point"
+    self.sendTargetPointButton.enabled = False
+    self.sendTargetPointButton.setMaximumWidth(200)
+    outboundLayoutTop.addRow("   Publish Skin Entry coordinates : ", self.sendTargetPointButton)
+    self.sendTargetPointButton.connect('clicked()', self.onsendTargetPointButtonClicked)	
     
     # Send Skin Entry Point Button
     self.sendSkinEntryPointButton = qt.QPushButton("SEND SKIN ENTRY POINT")
@@ -238,25 +244,26 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.sendSkinEntryPointButton.setMaximumWidth(200)
     outboundLayoutTop.addRow("   Publish Skin Entry coordinates : ",self.sendSkinEntryPointButton)
     self.sendSkinEntryPointButton.connect('clicked()', self.onsendSkinEntryPointButtonClicked)
-    
-    # Move to skin entry aligned with target point Button
-    self.OriginButton = qt.QPushButton("ORIGIN")
-    self.OriginButton.toolTip = "Publish a command to move robot to entry position (aligned with target point)"
-    self.OriginButton.enabled = False
-    self.OriginButton.setMaximumWidth(200)
-    outboundLayoutTop.addRow("   Move linear stages to origin: ", self.OriginButton)
-    self.OriginButton.connect('clicked()', self.onOriginButtonClicked)	
+	
+    # Stop Button
+    self.StopButton = qt.QPushButton("STOP")
+    self.StopButton.toolTip = "Publish a command to stop the robot"
+    self.StopButton.enabled = True
+    self.StopButton.setMaximumWidth(200)
+    self.StopButton.setStyleSheet('QPushButton {color: red;}')
+    outboundLayoutTop.addRow("   Stop Robot: ", self.StopButton)
+    self.StopButton.connect('clicked()', self.onStopButtonClicked)	
     
     
     # Visibility icon planned path needle
-    self.plannedPathNeedleVisibleButton = qt.QPushButton()
-    eyeIconInvisible = qt.QPixmap(":/Icons/Small/SlicerInvisible.png")
-    self.plannedPathNeedleVisibleButton.setIcon(qt.QIcon(eyeIconInvisible))
-    self.plannedPathNeedleVisibleButton.setFixedWidth(25)
-    self.plannedPathNeedleVisibleButton.setCheckable(True)
+    #self.plannedPathNeedleVisibleButton = qt.QPushButton()
+    #eyeIconInvisible = qt.QPixmap(":/Icons/Small/SlicerInvisible.png")
+    #self.plannedPathNeedleVisibleButton.setIcon(qt.QIcon(eyeIconInvisible))
+    #self.plannedPathNeedleVisibleButton.setFixedWidth(25)
+    #self.plannedPathNeedleVisibleButton.setCheckable(True)
     # planningLayoutTop.addWidget(self.targetNeedleVisibleButton, 3, 1)
-    outboundLayoutTop.addRow(" ", self.plannedPathNeedleVisibleButton)
-    self.plannedPathNeedleVisibleButton.connect('clicked()', self.onPlannedPathNeedleVisibleButtonClicked)	
+    #outboundLayoutTop.addRow(" ", self.plannedPathNeedleVisibleButton)
+    #self.plannedPathNeedleVisibleButton.connect('clicked()', self.onPlannedPathNeedleVisibleButtonClicked)	
     
     # ----- Feedback from ROS2 modules GUI------	
     # Trajectory estimation model collapsible button
@@ -271,17 +278,17 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.instructionTextbox = qt.QLineEdit("")
     self.instructionTextbox.setReadOnly(True)
     self.instructionTextbox.setFixedWidth(200)
-    modelFormLayout.addRow("Instruction:", self.instructionTextbox)
+    modelFormLayout.addRow("   Instruction:", self.instructionTextbox)
 
     self.dzTextbox = qt.QLineEdit("No dz value received")
     self.dzTextbox.setReadOnly(True)
     self.dzTextbox.setFixedWidth(200)
-    modelFormLayout.addRow("dz:", self.dzTextbox)
+    modelFormLayout.addRow("   dz:", self.dzTextbox)
     
     self.dthetaTextbox = qt.QLineEdit("No dθ value received")
     self.dthetaTextbox.setReadOnly(True)
     self.dthetaTextbox.setFixedWidth(200)
-    modelFormLayout.addRow("dθ:", self.dthetaTextbox)
+    modelFormLayout.addRow("   dθ:", self.dthetaTextbox)
     
     
     # Needle Guide state collapsible button
@@ -308,7 +315,7 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.StateXZ = qt.QHBoxLayout()
     self.StateXZ.addWidget(self.xTextbox)
     self.StateXZ.addWidget(self.zTextbox)
-    NeedleGuideFormLayout.addRow("X, Z stage positions:", self.StateXZ)
+    NeedleGuideFormLayout.addRow("   X, Z stage positions:", self.StateXZ)
     
     self.yTextbox = qt.QLineEdit("No y position received")
     self.yTextbox.setReadOnly(True)
@@ -321,7 +328,7 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.StateYTheta = qt.QHBoxLayout()
     self.StateYTheta.addWidget(self.yTextbox)
     self.StateYTheta.addWidget(self.thetaTextbox)
-    NeedleGuideFormLayout.addRow("Depth Y and rotation θ:", self.StateYTheta)
+    NeedleGuideFormLayout.addRow("   Depth Y and rotation θ:", self.StateYTheta)
     
     # ----- Feedback from Imager GUI------	
     # Sensorized needle feedback collapsible button
@@ -466,6 +473,8 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     		self.xTargetTextbox.setText(round(targetCoordinatesRAS[0],2))
     		self.yTargetTextbox.setText(round(targetCoordinatesRAS[1],2))
     		self.zTargetTextbox.setText(round(targetCoordinatesRAS[2],2))
+    		self.xSkinEntryTextbox.setText(self.xTargetTextbox.text)
+    		self.zSkinEntryTextbox.setText(self.zTargetTextbox.text)
     		
   #def onSkinEntryPointFiducialChanged(self):
     #skinEntryPointNode = self.skinEntryPointNodeSelector.currentNode()
@@ -587,7 +596,8 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     homeNode.SetEncoding(3)
     slicer.mrmlScene.AddNode(homeNode)
     self.openIGTNode.RegisterOutgoingMRMLNode(homeNode)
-    self.openIGTNode.PushNode(homeNode) 
+    self.openIGTNode.PushNode(homeNode)  
+    #self.HomeButton.setStyleSheet('QPushButton {color: green;}')
     
   def onStopButtonClicked(self):
     print("Sending ABORT command")
@@ -624,7 +634,22 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     originNode.SetEncoding(3)
     slicer.mrmlScene.AddNode(originNode)
     self.openIGTNode.RegisterOutgoingMRMLNode(originNode)
-    self.openIGTNode.PushNode(originNode) 
+    self.openIGTNode.PushNode(originNode)
+    
+  def onZeroButtonClicked(self):
+    print("Set Origin to zero of the robot frame")
+    # Send stringMessage containing the command "ZERO" to the script via IGTLink
+    zeroNode = slicer.vtkMRMLTextNode()
+    zeroNode.SetName("ZERO")
+    zero_msg = "zero"
+    zeroNode.SetText(zero_msg)
+    print("Sending zero msg: ", zero_msg)
+    zeroNode.SetEncoding(3)
+    slicer.mrmlScene.AddNode(zeroNode)
+    self.openIGTNode.RegisterOutgoingMRMLNode(zeroNode)
+    self.openIGTNode.PushNode(zeroNode)
+    self.sendSkinEntryPointButton.enabled = True
+    self.sendTargetPointButton.enabled = True
     
   def onsendTargetPointButtonClicked(self):   
     print("Sending target point coordinates")
@@ -632,15 +657,14 @@ class SensorizedNeedleModuleWidget(ScriptedLoadableModuleWidget):
     self.openIGTNode.RegisterOutgoingMRMLNode(targetMsgNode)
     self.openIGTNode.PushNode(targetMsgNode)
     #Enable Origin button and send skin target button 
-    self.sendSkinEntryPointButton.enabled = True
-    self.OriginButton.enabled = True
+    #self.sendSkinEntryPointButton.enabled = True
+    #self.OriginButton.enabled = True
     
-    self.xSkinEntryTextbox.setText(self.xTargetTextbox.text)
-    self.zSkinEntryTextbox.setText(self.zTargetTextbox.text)
-    
+
   def onsendSkinEntryPointButtonClicked(self):  
     print("Sending skin entry point coordinates")
-    skinEntryMsgNode = slicer.mrmlScene.GetFirstNodeByName("SKIN_ENTRY_POINT")
+    #skinEntryMsgNode = slicer.mrmlScene.GetFirstNodeByName("SKIN_ENTRY_POINT")
+    skinEntryMsgNode = slicer.mrmlScene.GetFirstNodeByName("TARGET_POINT")
     self.openIGTNode.RegisterOutgoingMRMLNode(skinEntryMsgNode)
     self.openIGTNode.PushNode(skinEntryMsgNode)  
    #TODO Make it aligned with target point and not a point you can click 
